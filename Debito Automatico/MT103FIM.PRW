@@ -101,13 +101,13 @@ User Function MT103FIM()
 				EndIf
 			Else
 				APMSGINFO("Favor verificar data de vencimento informada. Baixa automatica não realizada.")
-				For i:= 1 to len(aBaixa)
-					cMsgLog += aBaixa[i]
-				Next i
+				cMsgLog := "Erro - Data base maior que data de vencimento."
 				GeraLog(cMsgLog)
 			Endif
 		Else
 			Alert("Titulo nao encontrado!!")
+			cMsgLog := "Erro - titulo não encotrado."
+			GeraLog(cMsgLog)			
 		Endif
 	EndIf
 		
