@@ -37,6 +37,7 @@ User Function MT103FIM()
 	Private cBco  	:= PADR(GetMv( "MV_DEBBCO" , , ),3) // Numero do banco
 	Private cAg   	:= PADR(GetMv( "MV_DEBAG" , ,  ),5) // Numero Agencia
 	Private cConta	:= PADR(GetMv( "MV_DEBCONT" , ,),10)// Numero conta
+	
 	Private cNomArqErro := ""
 		
 	//Efetua disponibilizacao do arquivo de exportacao gerado na pasta de SAIDA
@@ -60,29 +61,29 @@ User Function MT103FIM()
 		SE2->(dbSetOrder(1)) //
 		SE2->(dbGoTop())
 		If SE2->(dbSeek(xFilial("SE2") + cSerie  + cNfiscal + SPACE(TAMSX3("E2_PARCELA")[1]) + "NF " + CA100FOR + CLOJA))
+			
+			cHistBaixa := "DEBITO AUTO"
+					//Monta array com os dados da baixa a pagar do título
+			aBaixa := {}
+			AADD(aBaixa, {"E2_FILIAL" 	, SE2->E2_FILIAL , Nil})
+			AADD(aBaixa, {"E2_PREFIXO" 	, SE2->E2_PREFIXO, Nil})
+			AADD(aBaixa, {"E2_NUM" 		, SE2->E2_NUM  	 , Nil})
+			AADD(aBaixa, {"E2_PARCELA" 	, SE2->E2_PARCELA, Nil})
+			AADD(aBaixa, {"E2_TIPO" 		, SE2->E2_TIPO 	 , Nil})
+			AADD(aBaixa, {"E2_FORNECE" 	, SE2->E2_FORNECE, Nil})
+			AADD(aBaixa, {"E2_LOJA" 		, SE2->E2_LOJA 	 , Nil})
+			AADD(aBaixa, {"AUTMOTBX" 	, "DEB"     	 , Nil})
+			AADD(aBaixa, {"AUTBANCO" 	, cBco 		 	 , Nil})
+			AADD(aBaixa, {"AUTAGENCIA" 	, cAg 		 	 , Nil})
+			AADD(aBaixa, {"AUTCONTA" 	, cConta	 	 , Nil})
+			AADD(aBaixa, {"AUTDTBAIXA" 	, dDataBase      , Nil})
+			AADD(aBaixa, {"AUTDTCREDITO", SE2->E2_VENCREA, Nil})
+			AADD(aBaixa, {"AUTDTDEB"    , SE2->E2_VENCREA, Nil})
+			AADD(aBaixa, {"AUTHIST" 		, cHistBaixa 	 , Nil})
+			AADD(aBaixa, {"AUTVLRPG" 	, SE2->E2_SALDO  , Nil})
+					
 			If SE2->E2_VENCREA >= dDataBase
 				If SE2->E2_SALDO > 0
-					cHistBaixa := "DEBITO AUTO"
-					//ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
-					//³Monta array com os dados da baixa a pagar do título³
-					//ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
-					aBaixa := {}
-					AADD(aBaixa, {"E2_FILIAL" 	, SE2->E2_FILIAL , Nil})
-					AADD(aBaixa, {"E2_PREFIXO" 	, SE2->E2_PREFIXO, Nil})
-					AADD(aBaixa, {"E2_NUM" 		, SE2->E2_NUM  	 , Nil})
-					AADD(aBaixa, {"E2_PARCELA" 	, SE2->E2_PARCELA, Nil})
-					AADD(aBaixa, {"E2_TIPO" 		, SE2->E2_TIPO 	 , Nil})
-					AADD(aBaixa, {"E2_FORNECE" 	, SE2->E2_FORNECE, Nil})
-					AADD(aBaixa, {"E2_LOJA" 		, SE2->E2_LOJA 	 , Nil})
-					AADD(aBaixa, {"AUTMOTBX" 	, "DEB"     	 , Nil})
-					AADD(aBaixa, {"AUTBANCO" 	, cBco 		 	 , Nil})
-					AADD(aBaixa, {"AUTAGENCIA" 	, cAg 		 	 , Nil})
-					AADD(aBaixa, {"AUTCONTA" 	, cConta	 	 , Nil})
-					AADD(aBaixa, {"AUTDTBAIXA" 	, dDataBase      , Nil})
-					AADD(aBaixa, {"AUTDTCREDITO", SE2->E2_VENCREA, Nil})
-					AADD(aBaixa, {"AUTDTDEB"    , SE2->E2_VENCREA, Nil})
-					AADD(aBaixa, {"AUTHIST" 		, cHistBaixa 	 , Nil})
-					AADD(aBaixa, {"AUTVLRPG" 	, SE2->E2_SALDO  , Nil})
 					
 					ACESSAPERG("FIN080", .F.)
 					
@@ -91,42 +92,46 @@ User Function MT103FIM()
 					If lMsErroAuto
 						cNomArqErro := "MsautoLog.LOG"
 						MostraErro(cPath, cNomArqErro)
-						cMsgLog := MemoRead(cPath + cNomArqErro)      //     carrega o log gravado.
-						C201LOG(cMsgLog) // Chama função de log.
+						cMsgLog := MemoRead(cPath + cNomArqErro) //     carrega o log gravado.
+						GeraLog(cMsgLog) // Chama função de log.
 						AADD(aErros, MemoRead(cPath + cNomArqErro))
 						MsErase(cNomArqErro)
 						Return .F.
 					EndIf
 				EndIf
 			Else
-				APMSGINFO("Favor verificar data de vencimento informada. Baixa automatica nao realizada.")
+				APMSGINFO("Favor verificar data de vencimento informada. Baixa automatica não realizada.")
+				For i:= 1 to len(aBaixa)
+					cMsgLog += aBaixa[i]
+				Next i
+				GeraLog(cMsgLog)
 			Endif
 		Else
 			Alert("Titulo nao encontrado!!")
 		Endif
 	EndIf
 		
-Return
+Return Nil
 
 // Função temporaria para analise de erro.
 
-Static Function C201Log(_cMsg)
+Static Function GeraLog(cLog)
 
-	Local cArqTxt := "GeraProva.TXT"
-	Local nHdlog := fOpen(cArqTxt,2)
+	Local cArqTxt := "LogDbAuto.TXT"
+	Local nCodArq  := fOpen(cArqTxt,2)
 	Local cEOL    := "CHR(13)+CHR(10)"
 
  //caso não consiga abrir o arquivo...
-	If nHdlog == -1
+	If nCodArq == -1
       //tenta cria-lo
-		nHdlog := fCreate(cArqTxt,2)
+		nCodArq := fCreate(cArqTxt,2)
       //se também der erro
-		If nHdlog == -1
+		If nCodArq == -1
 			Return
 		EndIf
 	Else
       //vai para o fim do arquivo
-		fSeek(nHdlog,0,2)
+		fSeek(nCodArq,0,2)
 	Endif
 
 	If Empty(cEOL)
@@ -136,10 +141,10 @@ Static Function C201Log(_cMsg)
 		cEOL := &cEOL
 	Endif
 
-	_cMsg := DtoC(dDataBase) + " - " + Time() + " - " + _cMsg + cEOL
+	cLog := DtoC(dDataBase) + " - " + Time() + " - " + cLog + cEOL
 
-	fWrite(nHdlog,_cMsg,Len(_cMsg)) != Len(_cMsg)
+	fWrite(nCodArq,cLog,Len(cLog)) != Len(cLog)
 
-	fClose(nHdlog)
+	fClose(nCodArq)
 
  Return Nil
