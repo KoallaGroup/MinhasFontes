@@ -55,7 +55,7 @@ User Function MT103FIM()
 	
 	If cCONDICAO == cCond
 		
-		SLEEP(5000)// Marcio Felipe - 27-08-2014 - Colocado pois foi reclamado que alguns titulos não estão sendo baixados automaticamente
+		Processa({||U_Espera()},"Baixando Título","Processando aguarde...", .F.)
 		
 		dbSelectArea("SE2")
 		SE2->(dbSetOrder(1)) //
@@ -63,7 +63,7 @@ User Function MT103FIM()
 		If SE2->(dbSeek(xFilial("SE2") + cSerie  + cNfiscal + SPACE(TAMSX3("E2_PARCELA")[1]) + "NF " + CA100FOR + CLOJA))
 			
 			cHistBaixa := "DEBITO AUTO"
-					//Monta array com os dados da baixa a pagar do título
+			//Monta array com os dados da baixa a pagar do título
 			aBaixa := {}
 			AADD(aBaixa, {"E2_FILIAL" 	, SE2->E2_FILIAL , Nil})
 			AADD(aBaixa, {"E2_PREFIXO" 	, SE2->E2_PREFIXO, Nil})
@@ -89,6 +89,12 @@ User Function MT103FIM()
 					
 					MSEXECAUTO({|x,y| FINA080(x,y)}, aBaixa, nOpc)
 					
+					cMsgLog := "BAIXADO OK "  + CHR(13)+CHR(10)
+					cMsgLog += "   ooo FILIAL: " + SE2->E2_FILIAL + " - PREFIXO: " +  SE2->E2_PREFIXO + " - NUMERO: ";
+						+ SE2->E2_NUM + " - PARCELA: " + SE2->E2_PARCELA + " - TIPO: " +  SE2->E2_TIPO + " - FORNECEDOR: " +;
+						SE2->E2_FORNECE + " - LOJA: " + SE2->E2_LOJA + "."
+					GeraLog(cMsgLog)
+					
 					If lMsErroAuto
 						cNomArqErro := "MsautoLog.LOG"
 						MostraErro(cPath, cNomArqErro)
@@ -101,13 +107,19 @@ User Function MT103FIM()
 				EndIf
 			Else
 				APMSGINFO("Favor verificar data de vencimento informada. Baixa automatica não realizada.")
-				cMsgLog := "Erro - Data base maior que data de vencimento."
+				cMsgLog := "Erro - Data base maior que data de vencimento."  + CHR(13)+CHR(10)
+				cMsgLog += "   ### FILIAL: " + SE2->E2_FILIAL + " - PREFIXO: " +  SE2->E2_PREFIXO + " - NUMERO: ";
+					+ SE2->E2_NUM + " - PARCELA: " + SE2->E2_PARCELA + " - TIPO: " +  SE2->E2_TIPO + " - FORNECEDOR: " +;
+					SE2->E2_FORNECE + " - LOJA: " + SE2->E2_LOJA + "."
 				GeraLog(cMsgLog)
 			Endif
 		Else
 			Alert("Titulo nao encontrado!!")
 			cMsgLog := "Erro - titulo não encotrado."
-			GeraLog(cMsgLog)			
+			cMsgLog += "   *** FILIAL: " + SE2->E2_FILIAL + " - PREFIXO: " +  SE2->E2_PREFIXO + " - NUMERO: ";
+				+ SE2->E2_NUM + " - PARCELA: " + SE2->E2_PARCELA + " - TIPO: " +  SE2->E2_TIPO + " - FORNECEDOR: " +;
+				SE2->E2_FORNECE + " - LOJA: " + SE2->E2_LOJA + "."
+			GeraLog(cMsgLog)
 		Endif
 	EndIf
 		
@@ -118,7 +130,7 @@ Return Nil
 Static Function GeraLog(cLog)
 
 	Local cArqTxt := "LogDbAuto.TXT"
-	Local nCodArq  := fOpen(cArqTxt,2)
+	Local nCodArq := fOpen(cArqTxt,2)
 	Local cEOL    := "CHR(13)+CHR(10)"
 
  //caso não consiga abrir o arquivo...
@@ -147,4 +159,15 @@ Static Function GeraLog(cLog)
 
 	fClose(nCodArq)
 
- Return Nil
+Return Nil
+ 
+User Function Espera()
+	Local nTempo := 8
+	
+	ProcRegua(nTempo)
+
+	For i:= 1 to nTempo
+		IncProc()
+		SLEEP(1000)
+	Next
+Return Nil

@@ -34,4 +34,3 @@ User Function BusArq()
 	cArq := UPPER(cArq)
 	oDlg:Refresh()
 Return cArq
-
