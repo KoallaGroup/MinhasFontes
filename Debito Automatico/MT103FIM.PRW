@@ -29,7 +29,11 @@ User Function MT103FIM()
 	Local lExclui  	:= (nOpcao==5)
 	Local lGerArq		:= .T.
 	Local cCond 		:= GetMv( "MV_DEBCOND" , , ) // Parametro com condição de pagamento para Debito automatico.
-
+	Local lAchou		:= .F.
+	Local nTempo		:= 0
+	Local nProg		:= 3
+	Local cMsgLog		:= ""
+	
 	Private cPath  	:= GetSrvProfString("Startpath","")
 	Private aErros 	:= {}
 	Private lMsErroAuto := .F.
@@ -55,45 +59,57 @@ User Function MT103FIM()
 	
 	If cCONDICAO == cCond
 		
-		Processa({||U_Espera()},"Baixando Título","Processando aguarde...", .F.)
+		Processa({||U_Espera(3)},"Baixando Título","Processando aguarde...", .F.)
 		
 		dbSelectArea("SE2")
 		SE2->(dbSetOrder(1)) //
 		SE2->(dbGoTop())
-		If SE2->(dbSeek(xFilial("SE2") + cSerie  + cNfiscal + SPACE(TAMSX3("E2_PARCELA")[1]) + "NF " + CA100FOR + CLOJA))
-			
+		lAchou := SE2->(dbSeek(xFilial("SE2") + cSerie  + cNfiscal + SPACE(TAMSX3("E2_PARCELA")[1]);
+			+ "NF " + CA100FOR + CLOJA))
+		
+		While !lAchou .And. nTempo <= 3
+			nTempo++
+			Processa({||U_Espera(5)},"Baixando Título","Processando aguarde...", .F.)
+			lAchou := SE2->(dbSeek(xFilial("SE2") + cSerie  + cNfiscal + SPACE(TAMSX3("E2_PARCELA")[1]);
+				+ "NF " + CA100FOR + CLOJA))
+		End
+		
+		If lAchou
 			cHistBaixa := "DEBITO AUTO"
 			//Monta array com os dados da baixa a pagar do título
 			aBaixa := {}
-			AADD(aBaixa, {"E2_FILIAL" 	, SE2->E2_FILIAL , Nil})
-			AADD(aBaixa, {"E2_PREFIXO" 	, SE2->E2_PREFIXO, Nil})
-			AADD(aBaixa, {"E2_NUM" 		, SE2->E2_NUM  	 , Nil})
-			AADD(aBaixa, {"E2_PARCELA" 	, SE2->E2_PARCELA, Nil})
-			AADD(aBaixa, {"E2_TIPO" 		, SE2->E2_TIPO 	 , Nil})
-			AADD(aBaixa, {"E2_FORNECE" 	, SE2->E2_FORNECE, Nil})
-			AADD(aBaixa, {"E2_LOJA" 		, SE2->E2_LOJA 	 , Nil})
-			AADD(aBaixa, {"AUTMOTBX" 	, "DEB"     	 , Nil})
-			AADD(aBaixa, {"AUTBANCO" 	, cBco 		 	 , Nil})
-			AADD(aBaixa, {"AUTAGENCIA" 	, cAg 		 	 , Nil})
-			AADD(aBaixa, {"AUTCONTA" 	, cConta	 	 , Nil})
-			AADD(aBaixa, {"AUTDTBAIXA" 	, dDataBase      , Nil})
-			AADD(aBaixa, {"AUTDTCREDITO", SE2->E2_VENCREA, Nil})
-			AADD(aBaixa, {"AUTDTDEB"    , SE2->E2_VENCREA, Nil})
-			AADD(aBaixa, {"AUTHIST" 		, cHistBaixa 	 , Nil})
-			AADD(aBaixa, {"AUTVLRPG" 	, SE2->E2_SALDO  , Nil})
+			AADD(aBaixa, {"E2_FILIAL" 	, SE2->E2_FILIAL 	, Nil})
+			AADD(aBaixa, {"E2_PREFIXO" 	, SE2->E2_PREFIXO	, Nil})
+			AADD(aBaixa, {"E2_NUM" 		, SE2->E2_NUM  	, Nil})
+			AADD(aBaixa, {"E2_PARCELA" 	, SE2->E2_PARCELA	, Nil})
+			AADD(aBaixa, {"E2_TIPO" 		, SE2->E2_TIPO 	, Nil})
+			AADD(aBaixa, {"E2_FORNECE" 	, SE2->E2_FORNECE	, Nil})
+			AADD(aBaixa, {"E2_LOJA" 		, SE2->E2_LOJA 	, Nil})
+			AADD(aBaixa, {"AUTMOTBX" 	, "DEB"     	 	, Nil})
+			AADD(aBaixa, {"AUTBANCO" 	, cBco 		 	, Nil})
+			AADD(aBaixa, {"AUTAGENCIA" 	, cAg 		 		, Nil})
+			AADD(aBaixa, {"AUTCONTA" 	, cConta	 	 	, Nil})
+			AADD(aBaixa, {"AUTDTBAIXA" 	, dDataBase      	, Nil})
+			AADD(aBaixa, {"AUTDTCREDITO", SE2->E2_VENCREA	, Nil})
+			AADD(aBaixa, {"AUTDTDEB"    , SE2->E2_VENCREA	, Nil})
+			AADD(aBaixa, {"AUTHIST" 		, cHistBaixa 	 	, Nil})
+			AADD(aBaixa, {"AUTVLRPG" 	, SE2->E2_SALDO  	, Nil})
 					
 			If SE2->E2_VENCREA >= dDataBase
+				
 				If SE2->E2_SALDO > 0
 					
 					ACESSAPERG("FIN080", .F.)
 					
 					MSEXECAUTO({|x,y| FINA080(x,y)}, aBaixa, nOpc)
 					
-					cMsgLog := "BAIXADO OK "  + CHR(13)+CHR(10)
-					cMsgLog += "   ooo FILIAL: " + SE2->E2_FILIAL + " - PREFIXO: " +  SE2->E2_PREFIXO + " - NUMERO: ";
-						+ SE2->E2_NUM + " - PARCELA: " + SE2->E2_PARCELA + " - TIPO: " +  SE2->E2_TIPO + " - FORNECEDOR: " +;
-						SE2->E2_FORNECE + " - LOJA: " + SE2->E2_LOJA + "."
-					GeraLog(cMsgLog)
+					If !lMsErroAuto
+						cMsgLog := "BAIXADO OK "  + CHR(13)+CHR(10)
+						cMsgLog += "   ooo FILIAL: " + SE2->E2_FILIAL + " - PREFIXO: " +  SE2->E2_PREFIXO + " - NUMERO: ";
+							+ SE2->E2_NUM + " - PARCELA: " + SE2->E2_PARCELA + " - TIPO: " +  SE2->E2_TIPO + " - FORNECEDOR: " +;
+							SE2->E2_FORNECE + " - LOJA: " + SE2->E2_LOJA + "." + CHR(13)+CHR(10)
+						GeraLog(cMsgLog)
+					EndIf
 					
 					If lMsErroAuto
 						cNomArqErro := "MsautoLog.LOG"
@@ -102,7 +118,6 @@ User Function MT103FIM()
 						GeraLog(cMsgLog) // Chama função de log.
 						AADD(aErros, MemoRead(cPath + cNomArqErro))
 						MsErase(cNomArqErro)
-						Return .F.
 					EndIf
 				EndIf
 			Else
@@ -110,15 +125,15 @@ User Function MT103FIM()
 				cMsgLog := "Erro - Data base maior que data de vencimento."  + CHR(13)+CHR(10)
 				cMsgLog += "   ### FILIAL: " + SE2->E2_FILIAL + " - PREFIXO: " +  SE2->E2_PREFIXO + " - NUMERO: ";
 					+ SE2->E2_NUM + " - PARCELA: " + SE2->E2_PARCELA + " - TIPO: " +  SE2->E2_TIPO + " - FORNECEDOR: " +;
-					SE2->E2_FORNECE + " - LOJA: " + SE2->E2_LOJA + "."
+					SE2->E2_FORNECE + " - LOJA: " + SE2->E2_LOJA + "." + CHR(13)+CHR(10)
 				GeraLog(cMsgLog)
 			Endif
 		Else
 			Alert("Titulo nao encontrado!!")
-			cMsgLog := "Erro - titulo não encotrado."
-			cMsgLog += "   *** FILIAL: " + SE2->E2_FILIAL + " - PREFIXO: " +  SE2->E2_PREFIXO + " - NUMERO: ";
-				+ SE2->E2_NUM + " - PARCELA: " + SE2->E2_PARCELA + " - TIPO: " +  SE2->E2_TIPO + " - FORNECEDOR: " +;
-				SE2->E2_FORNECE + " - LOJA: " + SE2->E2_LOJA + "."
+			cMsgLog := "Erro - Titulo não encotrado." + CHR(13)+CHR(10)
+			cMsgLog += "   *** FILIAL: " + xFilial("SE2") + " - Serie: " + cSerie + " - Nota Fiscal: " + cNfiscal
+			+ " - Parcela: " + SPACE(TAMSX3("E2_PARCELA")[1]) + " - Fornecedor: " + CA100FOR + " - Loja: " + CLOJA + "." ;
+				+ CHR(13)+CHR(10)
 			GeraLog(cMsgLog)
 		Endif
 	EndIf
@@ -153,7 +168,8 @@ Static Function GeraLog(cLog)
 		cEOL := &cEOL
 	Endif
 
-	cLog := DtoC(dDataBase) + " - " + Time() + " - " + cLog + cEOL
+	cLog := "*##* " + DtoC(Date()) + " - " + Time() + " - " + "DataBase (" + DtoC(dDataBase) +  ") - ";
+		+ "User: " + cUserName + " - " + cLog + cEOL
 
 	fWrite(nCodArq,cLog,Len(cLog)) != Len(cLog)
 
@@ -161,12 +177,11 @@ Static Function GeraLog(cLog)
 
 Return Nil
  
-User Function Espera()
-	Local nTempo := 8
-	
-	ProcRegua(nTempo)
+User Function Espera(nProg)
+		
+	ProcRegua(nProg)
 
-	For i:= 1 to nTempo
+	For i:= 1 to nProg
 		IncProc()
 		SLEEP(1000)
 	Next
